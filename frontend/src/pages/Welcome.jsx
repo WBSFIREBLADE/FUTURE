@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { logInfo, logWarn, logError } from "../utils/logger";
 
 // Results table component
 function ResultsTable({ columns, rows }) {
@@ -63,20 +64,26 @@ export default function Welcome() {
   }, []);
 
   const handleLogout = () => {
+    logInfo("User logout", {});
     localStorage.removeItem("access");
     localStorage.removeItem("refresh");
     navigate("/login");
   };
 
   const handleFileChange = (e) => {
+    logInfo("File selected for upload", { filename: e.target.files[0]?.name });
     setFile(e.target.files[0]);
     setErrors([]);
     setSuccess(null);
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file) {
+      logWarn("Upload attempted without file selected");
+      return;
+    }
 
+    logInfo("Upload started", { filename: file.name });
     setLoading(true);
     setErrors([]);
     setSuccess(null);
@@ -97,6 +104,7 @@ export default function Welcome() {
       const data = await response.json();
 
       if (response.ok) {
+        logInfo("Upload completed", { filename: file.name, upload_id: data.upload_id });
         setSuccess(`"${data.filename}" uploaded successfully!`);
         setUploadResult(data);
         setFile(null);
@@ -104,13 +112,17 @@ export default function Welcome() {
         setQueryResult(null);
         setQueryHistory([]);
       } else if (response.status === 422) {
+        logWarn("Upload validation failed", { status: 422, errors: data.errors });
         setErrors(data.errors);
       } else if (response.status === 400) {
+        logWarn("Upload bad request", { status: 400, errors: data.errors });
         setErrors(data.errors?.upload_file || [{ message: "Invalid file." }]);
       } else if (response.status === 401) {
+        logWarn("Upload unauthorized", { status: 401 });
         navigate("/login");
       }
     } catch (err) {
+      logError("Upload request failed", { error: err?.message || err });
       setErrors([{ message: "Something went wrong. Please try again." }]);
     } finally {
       setLoading(false);
@@ -120,8 +132,12 @@ export default function Welcome() {
   const handleQuery = async (e) => {
     e.preventDefault();
     
-    if (!queryPrompt.trim() || !uploadResult) return;
+    if (!queryPrompt.trim() || !uploadResult) {
+      logWarn("Query attempted with missing input", { queryPrompt, uploadResult });
+      return;
+    }
 
+    logInfo("Query started", { table_name: uploadResult.table_name, prompt: queryPrompt });
     setQueryLoading(true);
     setQueryError(null);
     setQueryResult(null);
@@ -142,14 +158,18 @@ export default function Welcome() {
       const data = await response.json();
 
       if (response.ok) {
+        logInfo("Query executed successfully", { table_name: uploadResult.table_name, prompt: queryPrompt });
         setQueryResult(data);
         setQueryHistory([data, ...queryHistory.slice(0, 9)]);
       } else if (response.status === 401) {
+        logWarn("Query unauthorized", { status: 401 });
         navigate("/login");
       } else {
+        logWarn("Query failed", { status: response.status, error: data.error });
         setQueryError(data.error || "Failed to execute query");
       }
     } catch (err) {
+      logError("Query request failed", { error: err?.message || err });
       setQueryError("Something went wrong. Please try again.");
     } finally {
       setQueryLoading(false);

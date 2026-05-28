@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { logInfo, logWarn, logError } from "../utils/logger";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function Login() {
   };
 
   const handleLogin = async () => {
+    logInfo("Login attempt", { username: form.username });
     try {
       const res = await fetch(
         "http://127.0.0.1:8000/api/accounts/login/",
@@ -34,13 +36,14 @@ export default function Login() {
       if (res.ok) {
         localStorage.setItem("access", data.access);
         localStorage.setItem("refresh", data.refresh);
-
+        logInfo("Login successful", { username: form.username });
         navigate("/welcome");
       } else {
+        logWarn("Login failed", { status: res.status, body: data });
         alert("Invalid credentials");
       }
     } catch (err) {
-      console.error(err);
+      logError("Login request failed", { error: err?.message || err });
       alert("Server error");
     }
   };

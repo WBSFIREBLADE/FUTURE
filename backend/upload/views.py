@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -12,6 +14,8 @@ from .table_manager import (
     generate_sql_from_prompt,
     execute_query
 )
+
+logger = logging.getLogger(__name__)
 
 class ExcelUploadView(APIView):
     permission_classes = [IsAuthenticated]  # JWT protects this
@@ -49,10 +53,11 @@ class ExcelUploadView(APIView):
 
         # Step 4 — Generate table name and create table
         table_name = generate_table_name(request.user.id, upload.original_filename)
-        print(table_name, schema, column_names)
+        logger.info("Creating table for upload", extra={"user_id": request.user.id, "upload_id": upload.id, "table_name": table_name})
         table_created = create_table_from_schema(table_name, schema, column_names)
         
         if not table_created:
+            logger.error("Failed to create table from schema", extra={"table_name": table_name})
             return Response({
                 "success": False,
                 "error": "Failed to create table for this schema"
@@ -63,6 +68,7 @@ class ExcelUploadView(APIView):
         insert_result = insert_excel_data_into_table(table_name, file, column_names, schema)
         
         if not insert_result["success"]:
+            logger.error("Failed to insert excel data", extra={"table_name": table_name, "error": insert_result.get('error')})
             return Response({
                 "success": False,
                 "error": f"Failed to insert data: {insert_result.get('error', 'Unknown error')}"
@@ -111,12 +117,14 @@ class QueryTableView(APIView):
 
         # Validate inputs
         if not table_name and not upload_id:
+            logger.warning("Query request missing table_name and upload_id", extra={"user_id": request.user.id})
             return Response({
                 "success": False,
                 "error": "Either table_name or upload_id is required"
             }, status=400)
 
         if not query_prompt:
+            logger.warning("Query request missing prompt", extra={"user_id": request.user.id, "table_name": table_name})
             return Response({
                 "success": False,
                 "error": "query_prompt is required"
@@ -151,6 +159,7 @@ class QueryTableView(APIView):
         # Step 1: Get table structure
         struct_result = get_table_structure(table_name)
         if not struct_result.get("success"):
+            logger.error("Failed to get table structure", extra={"table_name": table_name, "error": struct_result.get('error')})
             return Response({
                 "success": False,
                 "error": f"Failed to get table structure: {struct_result.get('error')}"
@@ -159,8 +168,10 @@ class QueryTableView(APIView):
         schema_columns = struct_result.get("columns", [])
 
         # Step 2: Generate SQL from natural language using OpenAI
+        logger.info("Generating SQL from prompt", extra={"table_name": table_name, "query_prompt": query_prompt})
         sql_result = generate_sql_from_prompt(table_name, schema_columns, query_prompt)
         if not sql_result.get("success"):
+            logger.error("SQL generation failed", extra={"table_name": table_name, "error": sql_result.get('error')})
             return Response({
                 "success": False,
                 "error": sql_result.get("error", "Failed to generate SQL")
@@ -169,8 +180,10 @@ class QueryTableView(APIView):
         generated_sql = sql_result.get("sql")
 
         # Step 3: Execute the generated SQL
+        logger.info("Executing generated SQL", extra={"table_name": table_name, "sql": generated_sql})
         exec_result = execute_query(generated_sql)
         if not exec_result.get("success"):
+            logger.error("Query execution failed", extra={"table_name": table_name, "error": exec_result.get('error')})
             return Response({
                 "success": False,
                 "error": exec_result.get("error", "Failed to execute query")

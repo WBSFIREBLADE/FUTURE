@@ -1,3 +1,4 @@
+import logging
 import openpyxl
 from io import BytesIO
 from django.db import connection
@@ -7,6 +8,8 @@ import re
 import openai
 import json
 import os
+
+logger = logging.getLogger(__name__)
 
 
 def sanitize_column_name(name):
@@ -51,6 +54,7 @@ def create_table_from_schema(table_name, schema, column_names):
     Returns:
         bool: True if successful, False otherwise
     """
+    logger.info("create_table_from_schema called", extra={"table_name": table_name, "columns": column_names})
     try:
         # Build CREATE TABLE statement
         columns_sql = []
@@ -100,6 +104,7 @@ def insert_excel_data_into_table(table_name, file, column_names, schema):
             "error": str (if any)
         }
     """
+    logger.info("insert_excel_data_into_table called", extra={"table_name": table_name, "columns": column_names})
     try:
         # Load workbook
         file.seek(0)
@@ -161,8 +166,7 @@ def insert_excel_data_into_table(table_name, file, column_names, schema):
                     cursor.execute(insert_sql, tuple(values))
                     rows_inserted += 1
                 except Exception as e:
-                    # Log but continue (one bad row shouldn't stop everything)
-                    print(f"Error inserting row {row_num}: {e}")
+                    logger.warning("Error inserting row", extra={"table_name": table_name, "row_num": row_num, "error": str(e)})
                     continue
         
         return {
@@ -180,12 +184,13 @@ def insert_excel_data_into_table(table_name, file, column_names, schema):
 
 def drop_table(table_name):
     """Drop a dynamically created table"""
+    logger.info("drop_table called", extra={"table_name": table_name})
     try:
         with connection.cursor() as cursor:
             cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
         return True
     except Exception as e:
-        print(f"Error dropping table: {e}")
+        logger.exception("Error dropping table", extra={"table_name": table_name, "error": str(e)})
         return False
 
 
@@ -202,6 +207,7 @@ def get_table_structure(table_name):
             "error": str (if any)
         }
     """
+    logger.info("get_table_structure called", extra={"table_name": table_name})
     try:
         # Quote the table name to avoid syntax errors for names with special chars (e.g. hyphens)
         quoted_table = connection.ops.quote_name(table_name)
@@ -246,9 +252,11 @@ def generate_sql_from_prompt(table_name, schema_columns, user_prompt):
             "error": str (if any)
         }
     """
+    logger.info("generate_sql_from_prompt called", extra={"table_name": table_name, "prompt": user_prompt})
     try:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
+            logger.error("OpenAI API key not configured")
             return {
                 "success": False,
                 "error": "OpenAI API key not configured"

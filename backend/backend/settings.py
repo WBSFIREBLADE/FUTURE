@@ -180,3 +180,44 @@ CORS_ALLOW_ALL_ORIGINS = True
 # add this at the bottom of settings.py
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "daily_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": 30,
+            "filename": str(LOG_DIR / "future.log"),
+            "formatter": "verbose",
+            "encoding": "utf-8",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console", "daily_file"],
+            "level": "INFO",
+            "propagate": True,
+        },
+        "backend": {
+            "handlers": ["console", "daily_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}

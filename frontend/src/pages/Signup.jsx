@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { logInfo, logWarn, logError } from "../utils/logger";
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export default function Signup() {
 
   // 🔥 handle signup API
   const handleSignup = async () => {
+    logInfo("Signup attempt", { username: form.username, email: form.email });
     try {
       const res = await fetch(
         "http://127.0.0.1:8000/api/accounts/register/",
@@ -35,14 +37,15 @@ export default function Signup() {
       const data = await res.json();
 
       if (res.ok) {
+        logInfo("Signup successful", { username: form.username, email: form.email });
         alert("Signup successful 🚀");
         navigate("/login"); // redirect after signup
       } else {
-        console.log(data);
+        logWarn("Signup failed", { status: res.status, body: data });
         alert("Error signing up");
       }
     } catch (error) {
-      console.error(error);
+      logError("Signup request failed", { error: error?.message || error });
       alert("Server error");
     }
   };
