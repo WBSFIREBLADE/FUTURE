@@ -220,4 +220,8 @@ LOGGING = {
             "propagate": False,
         },
     },
+    "root": {
+        "handlers": ["console", "daily_file"],
+        "level": "INFO",
+    },
 }
